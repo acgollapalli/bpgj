@@ -72,9 +72,9 @@ main :: proc () {
     }
     
     vertices := []Vertex{ 
-        {{ 0.0, 0.5, 0.0}, { 1.0, 0.0, 0.0 }},
-        {{ -0.5, -0.5, 0.0 }, { 0.0, 1.0, 0.0 }},
-        {{ 0.5, -0.5, 0.0 }, { 0.0, 0.0, 1.0 }}
+        {{ 0.0, 0.5, 0.5}, { 1.0, 0.0, 0.0 }},
+        {{ -0.5, -0.5, 0.5 }, { 0.0, 1.0, 0.0 }},
+        {{ 0.5, -0.5, 0.5 }, { 0.0, 0.0, 1.0 }}
     }
     
     vertex_buffer_descriptions := []sdl.GPUVertexBufferDescription{{
@@ -245,7 +245,7 @@ main :: proc () {
         if keyboard_state.d do dPos.x += 1
         
         if dPos.x != 0 && dPos.y != 0 do dPos /= SQRT_2
-        
+        // TODO(caleb): in order to make this ACTUALLY be camera movement, we'll need to use a real transformation matrix
         uniform_camera.position += (CAMERA_MOVEMENT_SPEED * dPos)
         
         // begin rendering
