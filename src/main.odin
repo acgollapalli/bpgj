@@ -55,10 +55,11 @@ main :: proc () {
     }
     
     vertices := []Vertex{ 
-        {{ 0.0, -0.5, 0.0}, { 1.0, 0.0, 0.0 }},
-        {{ 0.5, 0.5, 0.0 }, { 0.0, 1.0, 0.0 }},
-        {{ -0.5, 0.5, 0.0 }, { 0.0, 0.0, 1.0 }}
+        {{ 0.0, 0.5, 0.0}, { 1.0, 0.0, 0.0 }},
+        {{ -0.5, -0.5, 0.0 }, { 0.0, 1.0, 0.0 }},
+        {{ 0.5, -0.5, 0.0 }, { 0.0, 0.0, 1.0 }}
     }
+    
     vertex_buffer_descriptions := []sdl.GPUVertexBufferDescription{{
             slot = 0,
             pitch = size_of(Vertex),
@@ -108,26 +109,36 @@ main :: proc () {
         
         transfer_buffer_init := sdl.CreateGPUTransferBuffer(device, sdl.GPUTransferBufferCreateInfo {
                                                                 usage = .UPLOAD,
-                                                                size = size_of(vertices), // TODO(caleb): we may need two buffers
+                                                                size = size_of(Vertex)*u32(len(vertices)), // TODO(caleb): we may need two buffers
                                                                 // props go here
                                                             })
     {
-        host_side_transfer_buffer := sdl.MapGPUTransferBuffer(device, transfer_buffer_init, false)
+        host_side_transfer_buffer := sdl.MapGPUTransferBuffer(device, transfer_buffer_init, true)
             assert(host_side_transfer_buffer != nil)
-            mem.copy(&vertices, host_side_transfer_buffer, size_of(vertices))
+            mem.copy_non_overlapping(host_side_transfer_buffer, raw_data(vertices), size_of(Vertex)*len(vertices))
             sdl.UnmapGPUTransferBuffer(device, transfer_buffer_init)
             
     }
-    vertices_buffer_init := sdl.CreateGPUBuffer(device, sdl.GPUBufferCreateInfo {
-                                                    usage = { .VERTEX }, // MAYBE(caleb): also storage for colors?
-                                                    size = size_of(vertices),
-                                                })
+    
+    vertex_buffer_create_info := sdl.GPUBufferCreateInfo {
+        usage = { .VERTEX }, // MAYBE(caleb): also storage for colors?
+        size = size_of(Vertex)*u32(len(vertices)),
+    }
+    assert(vertex_buffer_create_info.size > 0)
+        vertices_buffer_init := sdl.CreateGPUBuffer(device, vertex_buffer_create_info)
         
         command_buf_init := sdl.AcquireGPUCommandBuffer(device)
         copy_pass := sdl.BeginGPUCopyPass(command_buf_init)
         sdl.UploadToGPUBuffer(copy_pass, 
-                              sdl.GPUTransferBufferLocation { transfer_buffer_init, 0 },
-                              sdl.GPUBufferRegion {vertices_buffer_init, 0, size_of(vertices)},
+                              sdl.GPUTransferBufferLocation { 
+                                  transfer_buffer = transfer_buffer_init, 
+                                  offset = 0 
+                              },
+                              sdl.GPUBufferRegion {
+                                  buffer = vertices_buffer_init, 
+                                  offset = 0, 
+                                  size = size_of(Vertex)*u32(len(vertices))
+                              },
                               true)
         sdl.EndGPUCopyPass(copy_pass)
         fence_init := sdl.SubmitGPUCommandBufferAndAcquireFence(command_buf_init)
