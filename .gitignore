@@ -1,0 +1,7 @@
+*.spv
+*.exe
+*.pdb
+*.rdi
+.vs/
+*.dll
+*.lib

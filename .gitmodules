@@ -1,0 +1,3 @@
+[submodule "odin"]
+	path = tools/odin
+	url = git@github.com:acgollapalli/odin.git
