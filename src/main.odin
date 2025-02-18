@@ -2,9 +2,8 @@
 
 SDG                                                                                  JJ
 
-Blank Page Game Jam
-Entry Point
-
+                                Blank Page Game Jam
+                                   Entry Point
 */
 
 package drill
@@ -12,6 +11,11 @@ package drill
 import "core:fmt"
 import "core:mem"
 import sdl "vendor:sdl3"
+
+// TODO(caleb): figure out why odin never finds sdl3.lib on windows or mac
+//when ODIN_OS == .Darwin {
+//    foreign import "../tools/sdl/macos_aarch64/SDL3"
+//}
 
 SHADER_FORMAT : sdl.GPUShaderFormat
 
@@ -40,7 +44,7 @@ CAMERA_MOVEMENT_SPEED :: 0.01
 main :: proc () {
     when ODIN_OS != .Darwin {
         SHADER_FORMAT = { .SPIRV }
-        shader_code_vert := #load("../assets/shaders/base_vert.spv")
+        shader_code_vert := #load("../assets/shaders/vulkan/base_vert.spv")
         vert_info := sdl.GPUShaderCreateInfo {
             code_size =            len(shader_code_vert),
             code =                 raw_data(shader_code_vert),
@@ -54,7 +58,7 @@ main :: proc () {
             props =                0,
         }
         
-        shader_code_frag := #load("../assets/shaders/base_frag.spv")
+        shader_code_frag := #load("../assets/shaders/vulkan/base_frag.spv")
         frag_info := sdl.GPUShaderCreateInfo {
             code_size =            len(shader_code_frag),
             code =                 raw_data(shader_code_frag),
@@ -69,6 +73,35 @@ main :: proc () {
         }
     } else {
         SHADER_FORMAT = { .MSL }
+        shader_code_vert := #load("../assets/shaders/metal/base_vert.metal")
+        assert(len(shader_code_vert) > 0)
+        vert_info := sdl.GPUShaderCreateInfo {
+            code_size =            len(shader_code_vert),
+            code =                 raw_data(shader_code_vert),
+            entrypoint =           "vertexShader",
+            format =               {.MSL},
+            stage =                .VERTEX,
+            num_samplers =         0, // TODO(caleb): change when we have samplers
+            num_storage_textures = 0,
+            num_storage_buffers=   0,
+            num_uniform_buffers=   1,
+            props =                0,
+        }
+        
+        shader_code_frag := #load("../assets/shaders/metal/base_frag.metal")
+        assert(len(shader_code_frag) > 0)
+        frag_info := sdl.GPUShaderCreateInfo {
+            code_size =            len(shader_code_frag),
+            code =                 raw_data(shader_code_frag),
+            entrypoint =           "fragmentShader",
+            format =               {.MSL},
+            stage =                .FRAGMENT,
+            num_samplers =         0, // TODO(caleb): change when we have samplers
+            num_storage_textures = 0,
+            num_storage_buffers=   0,
+            num_uniform_buffers=   0,
+            props =                0,
+        }
     }
     
     vertices := []Vertex{ 
@@ -110,30 +143,35 @@ main :: proc () {
     windowFlags : sdl.WindowFlags = {}
     
     window := sdl.CreateWindow("Drill: The Blank Page Game Jam Game", 1920, 1080, windowFlags)
-        fmt.assertf(window != nil, "Could not get window!")
+    fmt.assertf(window != nil, "Could not get window!")
         
-        device := sdl.CreateGPUDevice(SHADER_FORMAT, ODIN_DEBUG, nil)
-        claimed := sdl.ClaimWindowForGPUDevice(device, window)
-        fmt.assertf(claimed, "Window not claimed by gpu device!")
-        // TODO(caleb): check to ensure GPU supports present modes 
-        // TODO(caleb): check to ensure GPU supports swapchain composition
-        swapchain_format := sdl.GetGPUSwapchainTextureFormat(device, window)
+    device := sdl.CreateGPUDevice(SHADER_FORMAT, ODIN_DEBUG, nil)
+    assert(device != nil)
+    claimed := sdl.ClaimWindowForGPUDevice(device, window)
+    fmt.assertf(claimed, "Window not claimed by gpu device!")
+    // TODO(caleb): check to ensure GPU supports present modes 
+    // TODO(caleb): check to ensure GPU supports swapchain composition
+    swapchain_format := sdl.GetGPUSwapchainTextureFormat(device, window)
         
-        vert_shader := sdl.CreateGPUShader(device, vert_info)
-        defer sdl.ReleaseGPUShader(device, vert_shader)
-        frag_shader := sdl.CreateGPUShader(device, frag_info)
-        defer sdl.ReleaseGPUShader(device, frag_shader)
-        
-        transfer_buffer_init := sdl.CreateGPUTransferBuffer(device, sdl.GPUTransferBufferCreateInfo {
-                                                                usage = .UPLOAD,
-                                                                size = size_of(Vertex)*u32(len(vertices)), // TODO(caleb): we may need two buffers
-                                                                // props go here
-                                                            })
+    vert_shader := sdl.CreateGPUShader(device, vert_info)
+    assert(vert_shader != nil)
+    defer sdl.ReleaseGPUShader(device, vert_shader)
+    
+    frag_shader := sdl.CreateGPUShader(device, frag_info)
+    assert(frag_shader != nil)
+    defer sdl.ReleaseGPUShader(device, frag_shader)
+    
+    transfer_buffer_init := sdl.CreateGPUTransferBuffer(device, 
+                                                        sdl.GPUTransferBufferCreateInfo {
+                                                            usage = .UPLOAD,
+                                                            size = size_of(Vertex)*u32(len(vertices)), // TODO(caleb): we may need two buffers
+                                                            // props go here
+                                                        })
     {
         host_side_transfer_buffer := sdl.MapGPUTransferBuffer(device, transfer_buffer_init, true)
-            assert(host_side_transfer_buffer != nil)
-            mem.copy_non_overlapping(host_side_transfer_buffer, raw_data(vertices), size_of(Vertex)*len(vertices))
-            sdl.UnmapGPUTransferBuffer(device, transfer_buffer_init)
+        assert(host_side_transfer_buffer != nil)
+        mem.copy_non_overlapping(host_side_transfer_buffer, raw_data(vertices), size_of(Vertex)*len(vertices))
+        sdl.UnmapGPUTransferBuffer(device, transfer_buffer_init)
             
     }
     
