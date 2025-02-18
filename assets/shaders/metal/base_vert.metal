@@ -17,8 +17,8 @@ struct RasterizerData
 };
 
 struct BPGJVertex {
-	float3 position;
-	float3 color;
+	packed_float3 position;
+	packed_float3 color;
 };
 
 struct BPGJCamera {
@@ -33,6 +33,7 @@ vertexShader(uint vertexID [[vertex_id]],
 {
 	RasterizerData out;
 	out.position = float4(vertices[vertexID].position + camera->position, 1.0);
+	
 	out.color = float4(vertices[vertexID].color,1.0);
 	return out;
 }
