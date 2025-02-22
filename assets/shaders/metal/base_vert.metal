@@ -32,7 +32,8 @@ vertexShader(uint vertexID [[vertex_id]],
 			 constant BPGJVertex *vertices [[buffer(14)]])
 {
 	RasterizerData out;
-	out.position = float4(vertices[vertexID].position + camera->position, 1.0);
+	out.position = float4(vertices[vertexID].position + camera->position, 12.0);
+	out.position.z -= 1;
 	
 	out.color = float4(vertices[vertexID].color,1.0);
 	return out;

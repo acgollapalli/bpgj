@@ -12,17 +12,9 @@ import "core:fmt"
 import "core:mem"
 import sdl "vendor:sdl3"
 
-// TODO(caleb): figure out why odin never finds sdl3.lib on windows or mac
-//when ODIN_OS == .Darwin {
-//    foreign import "../tools/sdl/macos_aarch64/SDL3"
-//}
+// TODO(caleb): get sdl3 lib files from dist folder for approriate OS here 
 
 SHADER_FORMAT : sdl.GPUShaderFormat
-
-Vertex :: struct {
-    position: [3]f32,
-    color: [3]f32,
-}
 
 UniformCamera :: struct {
     position: [3]f32,
@@ -103,18 +95,17 @@ main :: proc () {
             props =                0,
         }
     }
+	mesh_file, vertices, indices := get_mesh_data("teapot.hxa")
+    defer destroy_resources(mesh_file, vertices, indices)
+    fmt.printfln("vertices: %v", len(vertices))
     
-    vertices := []Vertex{ 
-        {{ 0.0, 0.5, 0.5}, { 1.0, 0.0, 0.0 }},
-        {{ -0.5, -0.5, 0.5 }, { 0.0, 1.0, 0.0 }},
-        {{ 0.5, -0.5, 0.5 }, { 0.0, 0.0, 1.0 }}
-    }
-    
-    vertex_buffer_descriptions := []sdl.GPUVertexBufferDescription{{
+    vertex_buffer_descriptions := []sdl.GPUVertexBufferDescription{
+        {
             slot = 0,
             pitch = size_of(Vertex),
             input_rate = .VERTEX,
         }
+        
     }
     vertex_buffer_attributes := []sdl.GPUVertexAttribute{
         {
@@ -164,13 +155,16 @@ main :: proc () {
     transfer_buffer_init := sdl.CreateGPUTransferBuffer(device, 
                                                         sdl.GPUTransferBufferCreateInfo {
                                                             usage = .UPLOAD,
-                                                            size = size_of(Vertex)*u32(len(vertices)), // TODO(caleb): we may need two buffers
+                                                            size = size_of(Vertex)*u32(len(vertices)) + 
+                                                                size_of(Index)*u32(len(indices)), // TODO(caleb): we may need two buffers
                                                             // props go here
                                                         })
     {
         host_side_transfer_buffer := sdl.MapGPUTransferBuffer(device, transfer_buffer_init, true)
         assert(host_side_transfer_buffer != nil)
         mem.copy_non_overlapping(host_side_transfer_buffer, raw_data(vertices), size_of(Vertex)*len(vertices))
+        host_side_transfer_buffer_indices := rawptr(uintptr(host_side_transfer_buffer) + uintptr( size_of(Vertex)*len(vertices)))
+        mem.copy_non_overlapping(host_side_transfer_buffer_indices, raw_data(indices), size_of(Index)*len(indices))
         sdl.UnmapGPUTransferBuffer(device, transfer_buffer_init)
             
     }
@@ -180,26 +174,43 @@ main :: proc () {
         size = size_of(Vertex)*u32(len(vertices)),
     }
     assert(vertex_buffer_create_info.size > 0)
-        vertices_buffer_init := sdl.CreateGPUBuffer(device, vertex_buffer_create_info)
+    vertices_buffer_init := sdl.CreateGPUBuffer(device, vertex_buffer_create_info)
+    
+    index_buffer_create_info := sdl.GPUBufferCreateInfo {
+        usage = { .INDEX },
+        size = size_of(Index)*u32(len(indices))
+    }
+    indices_buffer_init := sdl.CreateGPUBuffer(device, index_buffer_create_info)
         
-        command_buf_init := sdl.AcquireGPUCommandBuffer(device)
-        copy_pass := sdl.BeginGPUCopyPass(command_buf_init)
-        sdl.UploadToGPUBuffer(copy_pass, 
-                              sdl.GPUTransferBufferLocation { 
-                                  transfer_buffer = transfer_buffer_init, 
-                                  offset = 0 
-                              },
-                              sdl.GPUBufferRegion {
-                                  buffer = vertices_buffer_init, 
-                                  offset = 0, 
-                                  size = size_of(Vertex)*u32(len(vertices))
-                              },
-                              true)
-        sdl.EndGPUCopyPass(copy_pass)
-        fence_init := sdl.SubmitGPUCommandBufferAndAcquireFence(command_buf_init)
-        
-        rasterizer_state := sdl.GPURasterizerState {
-        fill_mode = .FILL,
+    command_buf_init := sdl.AcquireGPUCommandBuffer(device)
+    copy_pass := sdl.BeginGPUCopyPass(command_buf_init)
+    sdl.UploadToGPUBuffer(copy_pass, 
+                          sdl.GPUTransferBufferLocation { 
+                              transfer_buffer = transfer_buffer_init, 
+                              offset = 0 
+                          },
+                          sdl.GPUBufferRegion {
+                              buffer = vertices_buffer_init, 
+                              offset = 0, 
+                              size = size_of(Vertex)*u32(len(vertices))
+                          },
+                          true)
+    sdl.UploadToGPUBuffer(copy_pass,
+                          sdl.GPUTransferBufferLocation {
+                              transfer_buffer = transfer_buffer_init,
+                              offset = size_of(Vertex)*u32(len(vertices)),
+                          },
+                          sdl.GPUBufferRegion {
+                              buffer = indices_buffer_init,
+                              offset = 0,
+                              size = size_of(Index)*u32(len(indices))
+                          },
+                          true)
+    sdl.EndGPUCopyPass(copy_pass)
+    fence_init := sdl.SubmitGPUCommandBufferAndAcquireFence(command_buf_init)
+    
+    rasterizer_state := sdl.GPURasterizerState {
+        fill_mode = .LINE,
         cull_mode = .BACK,
         front_face = .COUNTER_CLOCKWISE,
         // TODO(caleb): DEPTH PARAMS HERE
@@ -277,12 +288,12 @@ main :: proc () {
     
     // TODO(caleb): game computation goes here
     dPos : [3]f32 // TODO(caleb): not really an accurate name for this
-        if keyboard_state.w do dPos.y += 1
-        if keyboard_state.s do dPos.y -= 1
+        if keyboard_state.w do dPos.z += 1
+        if keyboard_state.s do dPos.z -= 1
         if keyboard_state.a do dPos.x -= 1
         if keyboard_state.d do dPos.x += 1
         
-        if dPos.x != 0 && dPos.y != 0 do dPos /= SQRT_2
+        if dPos.x != 0 && dPos.z != 0 do dPos /= SQRT_2
         // TODO(caleb): in order to make this ACTUALLY be camera movement, we'll need to use a real transformation matrix
         uniform_camera.position += (CAMERA_MOVEMENT_SPEED * dPos)
         
@@ -329,11 +340,17 @@ main :: proc () {
         }
     }
     
+    // TODO(caleb): index buffer bindings here
+    index_bindings := sdl.GPUBufferBinding{    
+        buffer = indices_buffer_init,
+        offset = 0 
+    }
     
-    sdl.BindGPUVertexBuffers(render_pass, 0, raw_data(vertex_bindings), auto_cast len(vertex_bindings));
+    sdl.BindGPUVertexBuffers(render_pass, 0, raw_data(vertex_bindings), auto_cast len(vertex_bindings))
+    sdl.BindGPUIndexBuffer(render_pass, index_bindings, ._32BIT)
     
     // TODO(caleb): bind vertex samplers here
-    sdl.DrawGPUPrimitives(render_pass, 3, 1, 0, 0);
+    sdl.DrawGPUIndexedPrimitives(render_pass, u32(len(indices)), 1, 0, 0, 0);
     sdl.EndGPURenderPass(render_pass);
     submit_ok := sdl.SubmitGPUCommandBuffer(command_buf_render);
     fmt.assertf(submit_ok, "Failed to sumbit command buffer!");
