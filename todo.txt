@@ -1,0 +1,10 @@
+TODO(caleb): Projection Matrix
+TODO(caleb): write asset server
+TODO(caleb): deploy asset server
+TODO(caleb): write HxA Serialized Reader
+TODO(caleb): write serialized asset loader
+TODO(caleb): add textures
+TODO(caleb): get a few actual assets
+TODO(caleb): figure out animation
+TODO(caleb): figure out some basic game mechanics
+
