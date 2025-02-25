@@ -33,7 +33,26 @@ SQRT_3 :: 1.73205080757
 
 CAMERA_MOVEMENT_SPEED :: 0.01
 
+// NOTE(caleb): this is the scratch function. Use it to quickly try out code and see what it does
+scratch :: proc() -> (scratch_run: bool) {
+    
+    m := matrix[2, 2]f32{
+        0, -1,
+        1, 0,
+    }
+   
+    v := [2]f32{ 2, 1 }
+    
+    fmt.printfln("scratch_result", v*m)
+    
+    //scratch_run = true
+    
+    return
+}
+
 main :: proc () {
+    if scratch() do return
+    
     when ODIN_OS != .Darwin {
         SHADER_FORMAT = { .SPIRV }
         shader_code_vert := #load("../assets/shaders/vulkan/base_vert.spv")
@@ -95,7 +114,7 @@ main :: proc () {
             props =                0,
         }
     }
-	mesh_file, vertices, indices := get_mesh_data("teapot.hxa")
+	mesh_file, vertices, indices := get_mesh_data("dice.hxa")
     defer destroy_resources(mesh_file, vertices, indices)
     fmt.printfln("vertices: %v", len(vertices))
     
@@ -210,8 +229,8 @@ main :: proc () {
     fence_init := sdl.SubmitGPUCommandBufferAndAcquireFence(command_buf_init)
     
     rasterizer_state := sdl.GPURasterizerState {
-        fill_mode = .LINE,
-        cull_mode = .BACK,
+        fill_mode = .FILL,
+        cull_mode = .NONE,
         front_face = .COUNTER_CLOCKWISE,
         // TODO(caleb): DEPTH PARAMS HERE
     }
@@ -259,11 +278,11 @@ main :: proc () {
     for !sdl.QueryGPUFence(device, fence_init) {}
     sdl.ReleaseGPUFence(device, fence_init);
     
-    uniform_camera : UniformCamera
+    uniform_camera : UniformCamera;
         
-        keyboard_state : KeyboardState
-        event : sdl.Event
-        mainloop: for  {
+    keyboard_state : KeyboardState;
+    event : sdl.Event;
+    mainloop: for  {
         if (sdl.PollEvent(&event)) { // handle input events
 #partial switch event.type {
             case .KEY_DOWN:

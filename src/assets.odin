@@ -25,13 +25,14 @@ get_mesh_data :: proc(mesh_name: string, alloc := context.allocator) -> (hxa.Fil
     file_name := strings.concatenate([]string{ASSET_DIR, mesh_name})
     defer delete(file_name)
     
-    mesh_file, read_err := hxa.read_from_file(file_name)
+    // TODO(caleb): eventually we need to pass this error back instead of crashing here.
+    mesh_file, read_err := hxa.read_from_file(file_name, true)
     fmt.assertf( read_err == nil, "could not load mesh %v because %v", mesh_name, read_err)
     
     // TODO(caleb): write a version of this that works on more than teapot 
     geometry_node := mesh_file.nodes[0].content.(hxa.Node_Geometry)
     vertex_count := int(geometry_node.vertex_count)
-    vertices_flat_array := geometry_node.vertex_stack[0].data.([]f64le)
+    vertices_flat_array := geometry_node.vertex_stack[0].data.([]f32le)
     
     vertices := make([]Vertex, vertex_count, alloc)
     
