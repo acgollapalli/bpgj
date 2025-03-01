@@ -17,8 +17,8 @@ import sdl "vendor:sdl3"
 SHADER_FORMAT : sdl.GPUShaderFormat
 
 UniformCamera :: struct {
-    position: [3]f32,
-    //rotation: quaternion128,
+    position: [3]f32,              // TODO(caleb): change to vec4
+    //rotation: quaternion128,     // TODO(caleb): write a function to turn this into a push constant mat4
 }
 
 KeyboardState :: struct {
@@ -28,12 +28,22 @@ KeyboardState :: struct {
     d: bool,
 }
 
-SQRT_2 :: 1.41421356237 
-SQRT_3 :: 1.73205080757
-
 CAMERA_MOVEMENT_SPEED :: 0.01
 
+// function for testing things when we compile
+scratch :: proc() {
+    q1 := quaternion(w= PI/2, x=0, y=1, z=0)
+    q2 := quaternion(w= PI/2, x=1, y=1, z=0)
+    
+    fmt.printfln("q1*q2: %v", q1*q2)
+}
+
+
 main :: proc () {
+    when ODIN_DEBUG {
+        scratch()
+    }
+    
     when ODIN_OS != .Darwin {
         SHADER_FORMAT = { .SPIRV }
         shader_code_vert := #load("../assets/shaders/vulkan/base_vert.spv")
